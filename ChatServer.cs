@@ -1,4 +1,5 @@
 ﻿using System;
+using ChatProtos.Networking;
 using CoreServer;
 
 
@@ -9,6 +10,7 @@ namespace ChatServer
         static void Main(string[] args)
         {
             HServer server = new HServer(4000);
+            server.RegisterDefaultCommands();
             server.Run();
         }
     }

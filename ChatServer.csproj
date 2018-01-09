@@ -9,4 +9,10 @@
     <ProjectReference Include="..\HServer\CoreServer.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Reference Include="JetBrains.Annotations.NetStandard">
+      <HintPath>..\..\..\.nuget\packages\jetbrains.annotations\10.2.1\lib\netstandard1.0\JetBrains.Annotations.NetStandard.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
 </Project>

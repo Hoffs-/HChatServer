@@ -1,15 +1,11 @@
 ﻿using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using System.Net.Sockets;
-using System.Text;
 using System.Threading.Tasks;
-using CoreServer.HMessaging.HAuthentication;
-using JetBrains.Annotations;
+using ChatServer.HAuthentication;
+using HServer;
 
-namespace CoreServer
+namespace ChatServer
 {
     public class HChatClient
     {
@@ -20,6 +16,7 @@ namespace CoreServer
         public string Username { get; private set; } = string.Empty;
         public string DisplayName { get; private set; } = string.Empty;
         private readonly ConcurrentDictionary<string, HChannel> _channels = new ConcurrentDictionary<string, HChannel>();
+        
         public HChatClient(HConnection connection)
         {
             Connection = connection;

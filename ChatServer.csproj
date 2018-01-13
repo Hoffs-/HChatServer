@@ -6,7 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\HServer\CoreServer.csproj" />
+    <ProjectReference Include="..\HServer\HServer.csproj" />
   </ItemGroup>
 
   <ItemGroup>

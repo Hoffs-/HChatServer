@@ -1,18 +1,18 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Threading.Tasks;
 using System.Linq;
-using ChatProtos.Networking;
+using System.Threading.Tasks;
 using Google.Protobuf;
+using HServer.ChatProtos.Networking;
 
-namespace CoreServer
+namespace ChatServer
 {
     public class HChannel
     {
-        private readonly HashSet<HChatClient> _joinedClients = new HashSet<HChatClient>();
+        private readonly BlockingCollection<HChatClient> _joinedClients = new BlockingCollection<HChatClient>();
         public Guid Guid { get; } = Guid.NewGuid();
         public string Name { get; private set; }
-        private readonly object _lock = new object();
 
         public HChannel(string name)
         {
@@ -26,52 +26,38 @@ namespace CoreServer
             await Task.WhenAll(tasks);
         }
 
+        // Maybe force these calls to be async too? In case they get blocked.
         public bool AddClient(HChatClient client)
         {
-            lock (_lock) // Add a check for permissions or if was invited.
+            // TODO: Check for permissions/invitation
+            try
             {
-                try
-                {
-                    _joinedClients.Add(client);
-                    return true;
-                } catch (ArgumentException)
-                {
-                    Console.WriteLine("[SERVER] User already in the channel.");
-                    return false;
-                }
+                _joinedClients.TryAdd(client);
+                return true;
+            } catch (ArgumentException)
+            {
+                Console.WriteLine("[SERVER] User already in the channel.");
+                return false;
             }
 
         }
 
         public bool RemoveClient(HChatClient client)
         {
-            lock (_lock)
-            {
-                if (_joinedClients.Contains(client))
-                {
-                    _joinedClients.Remove(client);
-                    return true;
-                } else
-                {
-                    return false;
-                }
-            }
+            if (!_joinedClients.Contains(client)) return false;
+            
+            _joinedClients.TryTake(out client);
+            return true;
         }
 
         public bool HasClient(HChatClient client)
         {
-            lock (_lock)
-            {
-                return _joinedClients.Contains(client);
-            }
+            return _joinedClients.Contains(client);
         }
 
         public List<HChatClient> GetClients()
         {
-            lock (_lock)
-            {
-                return _joinedClients.ToList();
-            }
+            return _joinedClients.ToList();
         }
 
         public static Predicate<HChannel> ByChannelName(string name)

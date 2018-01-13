@@ -1,11 +1,9 @@
 ﻿using System;
 using System.Threading.Tasks;
-using ChatProtos.Data;
-using ChatProtos.Networking;
-using ChatProtos.Networking.Messages;
-using CoreServer;
-using CoreServer.HMessaging;
 using Google.Protobuf;
+using HServer.ChatProtos.Data;
+using HServer.ChatProtos.Networking;
+using HServer.ChatProtos.Networking.Messages;
 
 namespace ChatServer.Messaging.Commands
 {
@@ -23,7 +21,7 @@ namespace ChatServer.Messaging.Commands
             var request = ChatMessageRequest.Parser.ParseFrom(message.Message);
             if (request.ChannelId == null || request.Message == null) return;
             var chatMessage = request.Message;
-            var channel = _channelManager.FindChannelById(request.ChannelId);
+            var channel = await _channelManager.FindChannelById(request.ChannelId);
             if (channel == null || !channel.HasClient(client)) return;
 
             Console.WriteLine("[SERVER] Sending message to channel {0}", channel.Guid);

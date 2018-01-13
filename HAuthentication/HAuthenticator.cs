@@ -1,6 +1,7 @@
-﻿using System.Threading.Tasks;
+﻿using System;
+using System.Threading.Tasks;
 
-namespace CoreServer.HMessaging.HAuthentication
+namespace ChatServer.HAuthentication
 {
     // TODO: Rework authentication to be more universal
     class HAuthenticator
@@ -15,12 +16,12 @@ namespace CoreServer.HMessaging.HAuthentication
         public async Task<AuthenticationResponse> TryPasswordAuthenticationTask(HChatClient client, string password)
         {
             
-            return new AuthenticationResponse(true, client.Id, "", "0000");
+            return new AuthenticationResponse(true, Guid.NewGuid().ToString(), "", "0000"); // TODO: Fix to return actual id
         }
 
         public async Task<AuthenticationResponse> TryTokenAuthenticationTask(HChatClient client, string token)
         {
-            return new AuthenticationResponse(true, client.Id, "", "0000");
+            return new AuthenticationResponse(true, Guid.NewGuid().ToString(), "", "0000"); // TODO: FIx to return actual id
         }
 
         public async Task<bool> DeauthenticateClientTask(HChatClient client)

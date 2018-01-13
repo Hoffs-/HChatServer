@@ -1,9 +1,7 @@
 ﻿using System;
 using System.Threading.Tasks;
-using ChatProtos.Networking;
-using ChatProtos.Networking.Messages;
-using CoreServer;
-using CoreServer.HMessaging;
+using HServer.ChatProtos.Networking;
+using HServer.ChatProtos.Networking.Messages;
 
 namespace ChatServer.Messaging.Commands
 {
@@ -29,10 +27,10 @@ namespace ChatServer.Messaging.Commands
                 HChannel channel = null;
                 if (joinRequest.ChannelId != null)
                 {
-                    channel = _channelManager.FindChannelById(joinRequest.ChannelId);
+                    channel = await _channelManager.FindChannelById(joinRequest.ChannelId);
                 } else if (joinRequest.ChannelName != null && channel == null)
                 {
-                    channel = _channelManager.FindChannelByName(joinRequest.ChannelName);
+                    channel = await _channelManager.FindChannelByName(joinRequest.ChannelName);
                 }
 
                 if (channel?.RemoveClient(client) == true)

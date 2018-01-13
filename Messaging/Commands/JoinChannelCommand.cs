@@ -1,9 +1,8 @@
 ﻿using System;
 using System.Threading.Tasks;
-using ChatProtos.Networking;
-using ChatProtos.Networking.Messages;
-using CoreServer;
-using CoreServer.HMessaging;
+using Google.Protobuf;
+using HServer.ChatProtos.Networking;
+using HServer.ChatProtos.Networking.Messages;
 
 namespace ChatServer.Messaging.Commands
 {
@@ -23,27 +22,53 @@ namespace ChatServer.Messaging.Commands
             {
                 Console.WriteLine("[SERVER] User {0} not authenticated to perform this action.",
                     client.Id);
+                await SendErrorMessageTask(client);
             }
             else
             {
                 HChannel channel = null;
                 if (joinRequest.ChannelId != null)
                 {
-                    channel = _channelManager.FindChannelById(joinRequest.ChannelId);
+                    channel = await _channelManager.FindChannelById(joinRequest.ChannelId);
                 } 
                 if (joinRequest.ChannelName != null && channel == null)
                 {
-                    channel = _channelManager.FindChannelByName(joinRequest.ChannelName);
+                    channel = await _channelManager.FindChannelByName(joinRequest.ChannelName);
                 }
 
                 if (channel?.AddClient(client) == true)
                 {
-                    // client.AddChannel(channel); // TODO: Fix this after moving to Interfaced logic
+                    client.AddChannel(channel);
                 }
+                await SendSuccessMessageTask(client, joinRequest.ChannelId); // TODO: Change to send actual channel ID
 
                 Console.WriteLine("[SERVER] User {0} tried joining channel {1}.",
                     client.Id, joinRequest.ChannelName);
             }
         }
+
+        private static async Task SendSuccessMessageTask(HChatClient client, string channelId)
+        {
+            var response = new ResponseMessage
+            {
+                Status = ResponseStatus.Success,
+                Type = RequestType.JoinChannel,
+                Message = new JoinChannelMessageResponse
+                {
+                    ChannelId = channelId
+                }.ToByteString()
+            };
+            await client.Connection.SendAyncTask(response.ToByteArray());
+        }
+
+        private static async Task SendErrorMessageTask(HChatClient client)
+        {
+            await client.Connection.SendAyncTask(new ResponseMessage
+            {
+                Status = ResponseStatus.Error,
+                Type = RequestType.JoinChannel
+            }.ToByteArray());
+        }
+
     }
 }

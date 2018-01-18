@@ -1,9 +1,10 @@
 ﻿using System;
 using System.Threading.Tasks;
+using ChatProtos.Data;
+using ChatProtos.Networking;
+using ChatProtos.Networking.Messages;
 using Google.Protobuf;
-using HServer.ChatProtos.Data;
-using HServer.ChatProtos.Networking;
-using HServer.ChatProtos.Networking.Messages;
+using HServer.Networking;
 
 namespace ChatServer.Messaging.Commands
 {
@@ -28,13 +29,13 @@ namespace ChatServer.Messaging.Commands
             await channel.SendToAll(
                 new ResponseMessage
                 {
-                    Type = RequestType.ChatMessage,
+                    Type = (int)RequestType.ChatMessage,
                     Message = new ChatMessageResponse
                     {
                         Message = new ChatMessage
                         {
                             AuthorId = chatMessage.AuthorId,
-                            MessageId = chatMessage.MessageId,
+                            Id = chatMessage.Id,
                             Text = chatMessage.Text,
                             Timestamp = chatMessage.Timestamp
                         }

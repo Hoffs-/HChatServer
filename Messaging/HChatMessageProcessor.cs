@@ -1,9 +1,10 @@
 ﻿using System;
 using System.Threading.Tasks;
+using ChatProtos.Networking;
 using ChatServer.Messaging.Commands;
 using HServer;
-using HServer.ChatProtos.Networking;
 using HServer.HMessaging;
+using HServer.Networking;
 
 namespace ChatServer.Messaging
 {
@@ -22,9 +23,19 @@ namespace ChatServer.Messaging
         {
             var requestMessage = RequestMessage.Parser.ParseFrom(message);
             var client = await _clientManager.GetClient(connection) ?? new HChatClient(connection);
-            var command = await _commandRegistry.GetCommand(new HCommandIdentifier(requestMessage.Type));
+            var command = await _commandRegistry.GetCommand(new HCommandIdentifier((int)requestMessage.Type));
             Console.WriteLine("Server processing command {0}", command?.ToString());
-            if (command != null) await command.ExecuteTask(client, requestMessage);
+            if (command != null)
+            {
+                try
+                {
+                    await command.ExecuteTask(client, requestMessage);
+                }
+                catch (NotImplementedException)
+                {
+                    Console.WriteLine("Command not implemented.");
+                }
+            }
         }
     }
 }

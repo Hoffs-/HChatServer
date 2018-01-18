@@ -1,8 +1,9 @@
 ﻿using System;
 using System.Threading.Tasks;
+using ChatProtos.Networking;
+using ChatProtos.Networking.Messages;
 using Google.Protobuf;
-using HServer.ChatProtos.Networking;
-using HServer.ChatProtos.Networking.Messages;
+using HServer.Networking;
 
 namespace ChatServer.Messaging.Commands
 {
@@ -23,7 +24,7 @@ namespace ChatServer.Messaging.Commands
                 return;
             }
 
-            var loginRequest = LoginMessageRequest.Parser.ParseFrom(message.Message);
+            var loginRequest = LoginRequest.Parser.ParseFrom(message.Message);
             var result = await client.TryAuthenticatingTask(loginRequest.Username, loginRequest.Password, loginRequest.Token);
             Console.WriteLine("[SERVER] After login for client {0}: {1} {2}", client.Id, result.Item1, result.Item2);
             if (client.Authenticated)
@@ -43,8 +44,8 @@ namespace ChatServer.Messaging.Commands
             var response = new ResponseMessage()
             {
                 Status = ResponseStatus.Success,
-                Type = RequestType.Login,
-                Message = new LoginMessageResponse
+                Type = (int)RequestType.Login,
+                Message = new LoginResponse
                 {
                     Token = client.Token,
                     UserId = client.Id
@@ -58,7 +59,7 @@ namespace ChatServer.Messaging.Commands
             await client.Connection.SendAyncTask(new ResponseMessage
             {
                 Status = ResponseStatus.Error,
-                Type = RequestType.Login
+                Type = (int)RequestType.Login
             }.ToByteArray());
         }
 

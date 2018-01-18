@@ -1,5 +1,6 @@
 ﻿using System.Threading.Tasks;
-using HServer.ChatProtos.Networking;
+using ChatProtos.Networking;
+using HServer.Networking;
 
 namespace ChatServer.Messaging.Commands
 {

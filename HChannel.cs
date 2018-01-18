@@ -3,8 +3,9 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using ChatProtos.Networking;
 using Google.Protobuf;
-using HServer.ChatProtos.Networking;
+using HServer.Networking;
 
 namespace ChatServer
 {

@@ -1,7 +1,8 @@
 ﻿using System;
 using System.Threading.Tasks;
-using HServer.ChatProtos.Networking;
-using HServer.ChatProtos.Networking.Messages;
+using ChatProtos.Networking;
+using ChatProtos.Networking.Messages;
+using HServer.Networking;
 
 namespace ChatServer.Messaging.Commands
 {
@@ -16,7 +17,7 @@ namespace ChatServer.Messaging.Commands
 
         public async Task ExecuteTask(HChatClient client, RequestMessage message)
         {
-            var logoutRequest = LogoutMessageRequest.Parser.ParseFrom(message.Message);
+            var logoutRequest = LogoutRequest.Parser.ParseFrom(message.Message);
             await client.TryDeauthenticatingTask();
             _clientManager.RemoveClient(client.Connection);
             Console.WriteLine("[SERVER] After logout for client {0}", client.Id);

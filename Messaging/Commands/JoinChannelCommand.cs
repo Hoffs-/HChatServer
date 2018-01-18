@@ -1,8 +1,9 @@
 ﻿using System;
 using System.Threading.Tasks;
+using ChatProtos.Networking;
+using ChatProtos.Networking.Messages;
 using Google.Protobuf;
-using HServer.ChatProtos.Networking;
-using HServer.ChatProtos.Networking.Messages;
+using HServer.Networking;
 
 namespace ChatServer.Messaging.Commands
 {
@@ -17,7 +18,7 @@ namespace ChatServer.Messaging.Commands
 
         public async Task ExecuteTask(HChatClient client, RequestMessage message)
         {
-            var joinRequest = JoinChannelMessageRequest.Parser.ParseFrom(message.Message);
+            var joinRequest = JoinChannelRequest.Parser.ParseFrom(message.Message);
             if (!client.Authenticated)
             {
                 Console.WriteLine("[SERVER] User {0} not authenticated to perform this action.",
@@ -30,10 +31,6 @@ namespace ChatServer.Messaging.Commands
                 if (joinRequest.ChannelId != null)
                 {
                     channel = await _channelManager.FindChannelById(joinRequest.ChannelId);
-                } 
-                if (joinRequest.ChannelName != null && channel == null)
-                {
-                    channel = await _channelManager.FindChannelByName(joinRequest.ChannelName);
                 }
 
                 if (channel?.AddClient(client) == true)
@@ -43,7 +40,7 @@ namespace ChatServer.Messaging.Commands
                 await SendSuccessMessageTask(client, joinRequest.ChannelId); // TODO: Change to send actual channel ID
 
                 Console.WriteLine("[SERVER] User {0} tried joining channel {1}.",
-                    client.Id, joinRequest.ChannelName);
+                    client.Id, joinRequest.ChannelId);
             }
         }
 
@@ -52,8 +49,8 @@ namespace ChatServer.Messaging.Commands
             var response = new ResponseMessage
             {
                 Status = ResponseStatus.Success,
-                Type = RequestType.JoinChannel,
-                Message = new JoinChannelMessageResponse
+                Type = (int)RequestType.JoinChannel,
+                Message = new JoinChannelResponse
                 {
                     ChannelId = channelId
                 }.ToByteString()
@@ -66,7 +63,7 @@ namespace ChatServer.Messaging.Commands
             await client.Connection.SendAyncTask(new ResponseMessage
             {
                 Status = ResponseStatus.Error,
-                Type = RequestType.JoinChannel
+                Type = (int)RequestType.JoinChannel
             }.ToByteArray());
         }
 

@@ -1,48 +1,80 @@
-﻿using System.Threading.Tasks;
-using ChatProtos.Networking;
-using ChatProtos.Networking.Messages;
-using Google.Protobuf;
-using HServer.Networking;
-
-namespace ChatServer.Messaging.Commands
+﻿namespace ChatServer.Messaging.Commands
 {
+    using System.Globalization;
+    using System.Threading.Tasks;
+
+    using ChatProtos.Data;
+    using ChatProtos.Networking;
+    using ChatProtos.Networking.Messages;
+
+    using Google.Protobuf;
+
+    using HServer.Networking;
+
+    using JetBrains.Annotations;
+
+    /// <inheritdoc />
+    /// <summary>
+    /// The user info server command.
+    /// </summary>
     public class UserInfoServerCommand : IChatServerCommand
     {
+        /// <inheritdoc />
         public async Task ExecuteTask(HChatClient client, RequestMessage message)
         {
             if (client.Authenticated)
             {
-                await SendInfoToUserTask(client);
+                await SendInfoTask(client).ConfigureAwait(false);
             }
             else
             {
-                await SendErrorTask(client);
+                await SendErrorTask(client).ConfigureAwait(false);
             }
         }
 
-        private async Task SendInfoToUserTask(HChatClient client)
+        /// <summary>
+        /// The send info task.
+        /// </summary>
+        /// <param name="client">
+        /// The client.
+        /// </param>
+        /// <returns>
+        /// The <see cref="Task"/>.
+        /// </returns>
+        private static async Task SendInfoTask([NotNull] HChatClient client)
         {
-            var response = new ResponseMessage
+            var response = new UserInfoResponse
             {
-                Status = ResponseStatus.Success,
-                Type = (int)RequestType.UserInfo,
-                Message = new UserInfoResponse
+                UserId = client.Id.ToString(), 
+                User = new User
                 {
-                    UserId = client.Id,
-                    User = null
-                }.ToByteString()
-            };
-            // await connection.SendAyncTask()
+                    Id = client.Id.ToString(),
+                    DisplayName = client.GetDisplayName(),
+                    Created = client.Created.ToString(CultureInfo.InvariantCulture),
+                    JoinedChannels = { },
+                    Roles = { }
+                }
+            }.ToByteString();
+            await client.SendResponseTask(ResponseStatus.Success, RequestType.UserInfo, response).ConfigureAwait(false);
         }
 
-        private async Task SendErrorTask(HChatClient client)
+        /// <summary>
+        /// The send error task.
+        /// </summary>
+        /// <param name="client">
+        /// The client.
+        /// </param>
+        /// <returns>
+        /// The <see cref="Task"/>.
+        /// </returns>
+        private static async Task SendErrorTask(HChatClient client)
         {
             var response = new ResponseMessage
             {
                 Status = ResponseStatus.Unauthorized,
                 Type = (int)RequestType.UserInfo
             };
-            await client.Connection.SendAyncTask(response.ToByteArray());
+            await client.Connection.SendMessageTask(response.ToByteArray());
         }
     }
 }

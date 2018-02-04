@@ -1,44 +1,91 @@
-﻿using System;
-using System.Collections.Concurrent;
-using System.Linq;
-using System.Threading.Tasks;
-using JetBrains.Annotations;
-
-namespace ChatServer
+﻿namespace ChatServer
 {
+    using System;
+    using System.Collections.Concurrent;
+    using System.Collections.Generic;
+    using System.Threading.Tasks;
+
+    using JetBrains.Annotations;
+
+    /// <summary>
+    /// The channel manager.
+    /// </summary>
     public class HChannelManager
     {
-        private readonly ConcurrentDictionary<Guid, HChannel> _hChannels = new ConcurrentDictionary<Guid, HChannel>();
+        /// <summary>
+        /// The channels.
+        /// </summary>
+        [NotNull]
+        private readonly ConcurrentDictionary<Guid, HChannel> _channels;
 
-        public async Task CreateChannel(string name)
+        /// <summary>
+        /// Initializes a new instance of the <see cref="HChannelManager"/> class.
+        /// </summary>
+        /// <param name="channels">
+        /// The channels.
+        /// </param>
+        public HChannelManager([NotNull] ConcurrentDictionary<Guid, HChannel> channels)
         {
-            await Task.Yield();
-            var channel = new HChannel(name);
-            _hChannels.TryAdd(channel.Guid, channel);
+            _channels = channels;
         }
 
-        [ItemCanBeNull]
-        public async Task<HChannel> FindChannelByName(string name)
+        /// <summary>
+        /// Adds channel.
+        /// </summary>
+        /// <param name="item">
+        /// The channel.
+        /// </param>
+        /// <returns>
+        /// The <see cref="Task"/>.
+        /// </returns>
+        public async Task<bool> AddItemTask([NotNull] HChannel item)
         {
             await Task.Yield();
-            return _hChannels.Values.FirstOrDefault(channel => channel.Name == name);
+            return _channels.TryAdd(item.Id, item);
         }
 
-        [ItemCanBeNull]
-        public async Task<HChannel> FindChannelById(string id)
+        /// <summary>
+        /// Removes channel.
+        /// </summary>
+        /// <param name="item">
+        /// The channel.
+        /// </param>
+        /// <returns>
+        /// The <see cref="Task"/>.
+        /// </returns>
+        public async Task<bool> RemoveItemTask([NotNull] HChannel item)
         {
             await Task.Yield();
-            if (!Guid.TryParse(id, out var guid)) return null;
-            _hChannels.TryGetValue(guid, out var channel);
-            return channel;
+            return _channels.TryRemove(item.Id, out var _);
         }
 
+        /// <summary>
+        /// Gets channel using GUID.
+        /// </summary>
+        /// <param name="id">
+        /// The GUID.
+        /// </param>
+        /// <returns>
+        /// The <see cref="Task"/>.
+        /// </returns>
         [ItemCanBeNull]
-        public async Task<HChannel> FindChannelByGuid(Guid guid)
+        public async Task<HChannel> GetItemTask(Guid id)
         {
             await Task.Yield();
-            _hChannels.TryGetValue(guid, out var channel);
-            return channel;
+            _channels.TryGetValue(id, out var result);
+            return result;
+        }
+
+        /// <summary>
+        /// Gets all channels.
+        /// </summary>
+        /// <returns>
+        /// The <see cref="Task"/>.
+        /// </returns>
+        public async Task<IEnumerable<HChannel>> GetChannelsTask()
+        {
+            await Task.Yield();
+            return _channels.Values;
         }
     }
 }

@@ -1,11 +1,16 @@
-﻿using System.Threading.Tasks;
-using ChatProtos.Networking;
-using HServer.Networking;
-
-namespace ChatServer.Messaging.Commands
+﻿namespace ChatServer.Messaging.Commands
 {
-    public class RemoveRoleServerCommand : IChatServerCommand
+    using System.Threading.Tasks;
+
+    using HServer.Networking;
+
+    /// <inheritdoc />
+    /// <summary>
+    /// The remove role server command.
+    /// </summary>
+    public class RemoveRoleCommand : IChatServerCommand
     {
+        /// <inheritdoc />
         public async Task ExecuteTask(HChatClient client, RequestMessage message)
         {
             throw new System.NotImplementedException();

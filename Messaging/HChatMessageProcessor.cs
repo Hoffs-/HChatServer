@@ -64,7 +64,7 @@
                 var requestMessage = RequestMessage.Parser.ParseFrom(message);
                 var client = await _clientManager.GetItemTask(connection).ConfigureAwait(false) ?? new HChatClient(connection, DateTime.Now);
                 var command = await _commandRegistry.GetCommand(new HCommandIdentifier((int)requestMessage.Type)).ConfigureAwait(false);
-                Console.WriteLine("Server processing command {0}", command?.ToString());
+                Console.WriteLine("[SERVER] Processing command {0}", command?.ToString());
                 if (command != null)
                 {
                     try

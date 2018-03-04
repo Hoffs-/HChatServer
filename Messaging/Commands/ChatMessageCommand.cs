@@ -1,4 +1,6 @@
-﻿namespace ChatServer.Messaging.Commands
+﻿using System.Text;
+
+namespace ChatServer.Messaging.Commands
 {
     using System;
     using System.Threading.Tasks;
@@ -41,9 +43,22 @@
         public async Task ExecuteTask(HChatClient client, RequestMessage message)
         {
             var parsed = ProtobufHelper.TryParse(ChatMessageRequest.Parser, message.Message, out var request);
-            if (!parsed || !client.Authenticated)
+            if (!parsed)
             {
-                // TODO: Send response
+                await client.SendResponseTask(ResponseStatus.BadRequest, RequestType.ChatMessage, null).ConfigureAwait(false);
+                return;
+            }
+
+            if (!client.Authenticated)
+            {
+                var response = new ChatMessageResponse()
+                {
+                    ChannelId = request?.ChannelId,
+                    Message = request?.Message
+                };
+                await client
+                    .SendResponseTask(ResponseStatus.Unauthorized, RequestType.ChatMessage, response.ToByteString())
+                    .ConfigureAwait(false);
                 return;
             }
 

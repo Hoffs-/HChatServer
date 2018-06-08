@@ -1,16 +1,15 @@
 ﻿namespace ChatServer.Messaging.Commands
 {
     using System;
+    using System.Linq;
     using System.Threading.Tasks;
 
-    using ChatProtos.Networking;
     using ChatProtos.Networking.Messages;
 
     using Google.Protobuf;
 
+    using HServer;
     using HServer.Networking;
-
-    using JetBrains.Annotations;
 
     /// <inheritdoc />
     /// <summary>
@@ -18,78 +17,36 @@
     /// </summary>
     public class LeaveChannelServerCommand : IChatServerCommand
     {
-        /// <summary>
-        /// The Community channel manager.
-        /// </summary>
-        [NotNull]
-        private readonly HCommunityManager _communityManager;
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="LeaveChannelServerCommand"/> class.
-        /// </summary>
-        /// <param name="communityManager">
-        /// The Community channel manager.
-        /// </param>
-        public LeaveChannelServerCommand([NotNull] HCommunityManager communityManager)
-        {
-            _communityManager = communityManager;
-        }
-
         /// <inheritdoc />
-        public async Task ExecuteTask(HChatClient client, RequestMessage message)
+        public async Task ExecuteTaskAsync(HChatClient client, RequestMessage message)
         {
-            var leaveRequest = LeaveChannelRequest.Parser.ParseFrom(message.Message);
-            if (!client.Authenticated)
+            var didParse = ProtobufHelper.TryParse(LeaveChannelRequest.Parser, message.Message, out var request);
+            if (!didParse || !Guid.TryParse(request.ChannelId, out _))
             {
-                Console.WriteLine("[SERVER] User {0} not authenticated to perform this action.", client.Id);
-                await SendReponseTask(client, ResponseStatus.Unauthorized, leaveRequest.ChannelId).ConfigureAwait(false);
+                await client.SendResponseTaskAsync(ResponseStatus.BadRequest, ByteString.Empty, message)
+                    .ConfigureAwait(false);
                 return;
             }
 
-            var channel = await _communityManager.TryGetChannelTask(leaveRequest.ChannelId).ConfigureAwait(false);
+            var response = new LeaveChannelResponse { ChannelId = request.ChannelId }.ToByteString();
 
+            var channel = client.GetChannels()
+                .FirstOrDefault(clientChannel => clientChannel.Id == Guid.Parse(request.ChannelId));
             if (channel == null)
             {
                 Console.WriteLine("[SERVER] User {0} tried leaving non-existing channel.", client.Id);
-                await SendReponseTask(client, ResponseStatus.Error, leaveRequest.ChannelId).ConfigureAwait(false);
+                await client.SendResponseTaskAsync(ResponseStatus.NotFound, response, message).ConfigureAwait(false);
                 return;
             }
 
-            if (!channel.HasItem(client.Id))
+            if (!channel.RemoveItem(client) || !client.RemoveChannel(channel))
             {
-                // TODO: Send response.
-                return;
+                Console.WriteLine("[SERVER] User {0} tried leaving channel {1}.", client.Id, request.ChannelId);
+                await client.SendResponseTaskAsync(ResponseStatus.Error, response, message).ConfigureAwait(false);
             }
 
-            if (await channel.RemoveItemTask(client).ConfigureAwait(false))
-            {
-                Console.WriteLine("[SERVER] User {0} left channel {1}.", client.Id, channel.Id);
-                client.RemoveChannel(channel);
-                await SendReponseTask(client, ResponseStatus.Success, leaveRequest.ChannelId).ConfigureAwait(false);
-            }
-
-            Console.WriteLine("[SERVER] User {0} tried leaving channel {1}.", client.Id, leaveRequest.ChannelId);
-        }
-
-        /// <summary>
-        /// Sends response to client.
-        /// </summary>
-        /// <param name="client">
-        /// The receiving client.
-        /// </param>
-        /// <param name="status">
-        /// The response status.
-        /// </param>
-        /// <param name="id">
-        /// The channel id.
-        /// </param>
-        /// <returns>
-        /// The <see cref="Task"/>.
-        /// </returns>
-        private static async Task SendReponseTask([NotNull] HChatClient client, ResponseStatus status, [CanBeNull] string id)
-        {
-            var leaveResponse = new LeaveChannelResponse { ChannelId = id }.ToByteString();
-            await client.SendResponseTask(status, RequestType.LeaveChannel, leaveResponse).ConfigureAwait(false);
+            await client.SendResponseTaskAsync(ResponseStatus.Success, response, message).ConfigureAwait(false);
+            Console.WriteLine("[SERVER] User {0} left channel {1}.", client.Id, channel.Id);
         }
     }
 }

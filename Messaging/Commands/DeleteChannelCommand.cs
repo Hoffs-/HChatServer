@@ -35,37 +35,57 @@
         }
 
         /// <inheritdoc />
-        public async Task ExecuteTask(HChatClient client, RequestMessage message)
+        public async Task ExecuteTaskAsync(HChatClient client, RequestMessage message)
         {
             if (!client.Authenticated)
             {
-                // TODO: Send response
+                await client.SendResponseTaskAsync(
+                    ResponseStatus.Unauthorized,
+                    RequestType.DeleteChannel,
+                    ByteString.Empty,
+                    message.Nonce).ConfigureAwait(false);
                 return;
             }
 
             var parsed = ProtobufHelper.TryParse(DeleteChannelRequest.Parser, message.Message, out var request);
             if (!parsed)
             {
-                // TODO: Send reponse
+                await client.SendResponseTaskAsync(
+                    ResponseStatus.Error,
+                    RequestType.DeleteChannel,
+                    ByteString.Empty,
+                    message.Nonce).ConfigureAwait(false);
                 return;
             }
 
-            var channel = await _communityManager.TryGetChannelTask(request.ChannelId).ConfigureAwait(false);
+            var response = new DeleteChannelResponse { ChannelId = request.ChannelId }.ToByteString();
+
+            var channel = _communityManager.TryGetChannel(request.ChannelId);
             if (channel == null)
             {
-                // TODO: Send response
+                await client.SendResponseTaskAsync(
+                    ResponseStatus.NotFound,
+                    RequestType.DeleteChannel,
+                    response,
+                    message.Nonce).ConfigureAwait(false);
                 return;
             }
 
             var community = channel.Community;
-            await community.ChannelManager.RemoveItemTask(channel).ConfigureAwait(false);
+            var removed = community.ChannelManager.RemoveItem(channel);
 
-            var response = new DeleteChannelResponse
+            if (!removed)
             {
-                ChannelId = channel.Id.ToString()
-            }.ToByteString();
+                await client.SendResponseTaskAsync(
+                    ResponseStatus.Error,
+                    RequestType.DeleteChannel,
+                    response,
+                    message.Nonce).ConfigureAwait(false);
+                return;
+            }
 
-            await community.SendToAllTask(ResponseStatus.Success, RequestType.DeleteCommunity, response).ConfigureAwait(false);
+            await community.SendToAllTask(ResponseStatus.Success, RequestType.DeleteCommunity, response)
+                .ConfigureAwait(false);
         }
     }
 }

@@ -69,11 +69,15 @@
                 {
                     try
                     {
-                        await command.ExecuteTask(client, requestMessage).ConfigureAwait(false);
+                        await command.ExecuteTaskAsync(client, requestMessage).ConfigureAwait(false);
                     }
                     catch (NotImplementedException)
                     {
                         Console.WriteLine("[SERVER] Command not implemented.");
+                    }
+                    catch (Exception e)
+                    {
+                        Console.WriteLine(e);
                     }
                 }
             }

@@ -3,6 +3,7 @@
     using System;
     using System.Collections.Concurrent;
     using System.Collections.Generic;
+    using System.Globalization;
     using System.Linq;
     using System.Threading.Tasks;
 
@@ -50,7 +51,12 @@
         /// <param name="created">
         /// The channel creation date time.
         /// </param>
-        public HChannel(Guid id, [NotNull] string name, [NotNull] HCommunity parent, [NotNull] ConcurrentDictionary<Guid, HChatClient> clients, DateTime created)
+        public HChannel(
+            Guid id,
+            [NotNull] string name,
+            [NotNull] HCommunity parent,
+            [NotNull] ConcurrentDictionary<Guid, HChatClient> clients,
+            DateTime created)
         {
             Id = id;
             Name = name;
@@ -82,12 +88,11 @@
         /// The client.
         /// </param>
         /// <returns>
-        /// Boolean and <see cref="Task"/>.
+        /// A <see cref="bool"/> if client was added.
         /// </returns>
-        public async Task<bool> AddItemTask([NotNull] HChatClient item)
+        public bool AddItem([NotNull] HChatClient item)
         {
             // TODO: Maybe add permission checking
-            await Task.Yield();
             return _clients.TryAdd(item.Id, item);
         }
 
@@ -98,11 +103,10 @@
         /// The client.
         /// </param>
         /// <returns>
-        /// Boolean and <see cref="Task"/>.
+        /// A <see cref="bool"/> if client was removed.
         /// </returns>
-        public async Task<bool> RemoveItemTask([NotNull] HChatClient item)
+        public bool RemoveItem([NotNull] HChatClient item)
         {
-            await Task.Yield();
             return _clients.TryRemove(item.Id, out var _);
         }
 
@@ -113,12 +117,11 @@
         /// The client id.
         /// </param>
         /// <returns>
-        /// HChatClient <see cref="Task"/>.
+        /// A <see cref="HChatClient"/>.
         /// </returns>
-        [ItemCanBeNull]
-        public async Task<HChatClient> GetItemTask(Guid id)
+        [CanBeNull]
+        public HChatClient GetItem(Guid id)
         {
-            await Task.Yield();
             _clients.TryGetValue(id, out var result);
             return result;
         }
@@ -132,15 +135,11 @@
         /// <returns>
         /// The <see cref="Task"/>.
         /// </returns>
-        public async Task<HChatClient> GetItemTask([CanBeNull] string id)
+        [CanBeNull]
+        public HChatClient GetItem([CanBeNull] string id)
         {
             var parsed = Guid.TryParse(id, out var guid);
-            if (!parsed)
-            {
-                return null;
-            }
-
-            return await GetItemTask(guid).ConfigureAwait(false);
+            return !parsed ? null : GetItem(guid);
         }
 
         /// <summary>
@@ -164,7 +163,7 @@
         [NotNull]
         public IEnumerable<User> GetUserItems()
         {
-            return _clients.Values.Select(client => client.GetAsUser());
+            return _clients.Values.Select(client => client.GetAsUserProto());
         }
 
         /// <summary>
@@ -190,11 +189,11 @@
         /// <returns>
         /// The <see cref="Task"/>.
         /// </returns>
-        public async Task SendToAllTask(ResponseMessage message)
+        public Task SendToAllTask(ResponseMessage message)
         {
             Console.WriteLine("[SERVER] Sending message to everyone in channel: {0}", Name);
             var tasks = _clients.Values.Select(client => client.Connection.SendMessageTask(message.ToByteArray()));
-            await Task.WhenAll(tasks).ConfigureAwait(false);
+            return Task.WhenAll(tasks);
         }
 
         /// <summary>
@@ -212,11 +211,23 @@
         /// <returns>
         /// The <see cref="Task"/>.
         /// </returns>
-        public async Task SendToAllTask(ResponseStatus status, RequestType type, ByteString message)
+        public Task SendToAllTask(ResponseStatus status, RequestType type, ByteString message)
         {
             Console.WriteLine("[SERVER] Sending message to everyone in channel: {0}", Name);
-            var tasks = _clients.Values.Select(client => client.SendResponseTask(status, type, message));
-            await Task.WhenAll(tasks).ConfigureAwait(false);
+            var tasks = _clients.Values.Select(client => client.SendResponseTaskAsync(status, type, message));
+            return Task.WhenAll(tasks);
+        }
+
+        /// <summary>
+        /// Get as protobuf object.
+        /// </summary>
+        /// <returns>
+        /// The protobuf <see cref="Channel"/>.
+        /// </returns>
+        // ReSharper disable once StyleCop.SA1650
+        public Channel GetAsProto()
+        {
+            return new Channel { Id = Id.ToString(), Name = Name, };
         }
 
         /*
@@ -229,5 +240,20 @@
         {
             return hChannel => hChannel.Id.ToString() == id;
         }*/
+
+        /// <summary>
+        /// Gets channel as channel info proto.
+        /// </summary>
+        /// <returns>
+        /// The <see cref="ChannelInfo"/>.
+        /// </returns>
+        public ChannelInfo GetAsChannelInfoProto()
+        {
+            return new ChannelInfo
+                       {
+                           Created = Created.ToString(CultureInfo.InvariantCulture),
+                           Users = { _clients.Values.Select(client => client.GetAsUserProto()) }
+                       };
+        }
     }
 }

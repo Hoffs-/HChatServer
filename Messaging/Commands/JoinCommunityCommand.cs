@@ -36,43 +36,58 @@
         }
 
         /// <inheritdoc />
-        public async Task ExecuteTask(HChatClient client, RequestMessage message)
+        public async Task ExecuteTaskAsync(HChatClient client, RequestMessage message)
         {
             if (!client.Authenticated)
             {
-                // TODO: Send response.
+                await client.SendResponseTaskAsync(
+                    ResponseStatus.Unauthorized,
+                    ByteString.Empty,
+                    message).ConfigureAwait(false);
                 return;
             }
 
             var parsed = ProtobufHelper.TryParse(JoinCommunityRequest.Parser, message.Message, out var request);
             if (!parsed)
             {
-                // TODO: Send response.
+                await client.SendResponseTaskAsync(
+                    ResponseStatus.Error,
+                    ByteString.Empty,
+                    message).ConfigureAwait(false);
                 return;
             }
 
-            var community = await _communityManager.GetItemTask(request.CommunityId);
+            var response = new JoinCommunityResponse
+            {
+                CommunityId = request.CommunityId,
+            }.ToByteString();
+
+            var community = _communityManager.GetItem(request.CommunityId);
             if (community == null)
             {
-                // TOOD: Send response.
+                await client.SendResponseTaskAsync(ResponseStatus.NotFound, response, message)
+                    .ConfigureAwait(false);
                 return;
             }
 
             // TODO: Check community password
-            var didJoin = await community.AddItemTask(client).ConfigureAwait(false);
-
-            var response = new JoinCommunityResponse
+            var didJoin = community.AddItem(client);
+            if (!didJoin)
             {
-                CommunityId = community.Id.ToString()
-            }.ToByteString();
+                await client.SendResponseTaskAsync(ResponseStatus.Forbidden, response, message)
+                    .ConfigureAwait(false);
+                return;
+            }
 
-            if (didJoin)
+            var didAdd = client.AddCommunity(community);
+            if (didAdd)
             {
-                await client.SendResponseTask(ResponseStatus.Success, RequestType.JoinCommunity, response).ConfigureAwait(false);
+                await client.SendResponseTaskAsync(ResponseStatus.Success, response, message).ConfigureAwait(false);
             }
             else
             {
-                await client.SendResponseTask(ResponseStatus.Forbidden, RequestType.JoinCommunity, response)
+                await community.RemoveItemTask(client).ConfigureAwait(false);
+                await client.SendResponseTaskAsync(ResponseStatus.Error, response, message)
                     .ConfigureAwait(false);
             }
         }

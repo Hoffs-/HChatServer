@@ -3,7 +3,6 @@
     using System;
     using System.Threading.Tasks;
 
-    using ChatProtos.Networking;
     using ChatProtos.Networking.Messages;
 
     using Google.Protobuf;
@@ -36,12 +35,13 @@
         }
 
         /// <inheritdoc />
-        public async Task ExecuteTask(HChatClient client, RequestMessage message)
+        public async Task ExecuteTaskAsync(HChatClient client, RequestMessage message)
         {
             if (client.Authenticated)
             {
                 // If client is already authenticated return error.
-                await SendErrorMessageTask(client).ConfigureAwait(false);
+                await client.SendResponseTaskAsync(ResponseStatus.Error, ByteString.Empty, message)
+                    .ConfigureAwait(false);
                 return;
             }
 
@@ -52,42 +52,26 @@
             {
                 // TODO: Set id/token/etc for client somewhere.
                 await _clientManager.AddItemTask(client).ConfigureAwait(false);
-                await SendSuccessMessageTask(client).ConfigureAwait(false);
+                var response = new LoginResponse { Token = client.Token, UserId = client.Id.ToString() }.ToByteString();
+                await client.SendResponseTaskAsync(ResponseStatus.Success, response, message)
+                    .ConfigureAwait(false);
             }
             else
             {
-                await SendErrorMessageTask(client).ConfigureAwait(false);
+                await client.SendResponseTaskAsync(ResponseStatus.Error, ByteString.Empty, message)
+                    .ConfigureAwait(false);
             }
         }
 
         /// <summary>
-        /// Sends success message to client.
+        /// Command name.
         /// </summary>
-        /// <param name="client">
-        /// The receiving client.
-        /// </param>
         /// <returns>
-        /// The <see cref="Task"/>.
+        /// The <see cref="string"/>.
         /// </returns>
-        private static async Task SendSuccessMessageTask([NotNull] HChatClient client)
+        public override string ToString()
         {
-            var response = new LoginResponse { Token = client.Token, UserId = client.Id.ToString() }.ToByteString();
-            await client.SendResponseTask(ResponseStatus.Success, RequestType.Login, response).ConfigureAwait(false);
-        }
-
-        /// <summary>
-        /// Sends error message to client.
-        /// </summary>
-        /// <param name="client">
-        /// The receiving client.
-        /// </param>
-        /// <returns>
-        /// The <see cref="Task"/>.
-        /// </returns>
-        private static async Task SendErrorMessageTask([NotNull] HChatClient client)
-        {
-            await client.SendResponseTask(ResponseStatus.Error, RequestType.Login, ByteString.Empty)
-                .ConfigureAwait(false);
+            return "Login";
         }
     }
 }

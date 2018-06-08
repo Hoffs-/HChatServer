@@ -17,7 +17,7 @@
     public class UpdateDisplayNameCommand : IChatServerCommand
     {
         /// <inheritdoc />
-        public async Task ExecuteTask(HChatClient client, RequestMessage message)
+        public async Task ExecuteTaskAsync(HChatClient client, RequestMessage message)
         {
             if (!client.Authenticated)
             {
@@ -40,7 +40,7 @@
                 DisplayName = client.GetDisplayName()
             }.ToByteString();
 
-            await client.SendResponseTask(ResponseStatus.Success, RequestType.UpdateDisplayName, response)
+            await client.SendResponseTaskAsync(ResponseStatus.Success, RequestType.UpdateDisplayName, response)
                 .ConfigureAwait(false);
         }
     }

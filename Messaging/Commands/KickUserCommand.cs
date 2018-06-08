@@ -37,21 +37,19 @@
         }
 
         /// <inheritdoc />
-        public async Task ExecuteTask(HChatClient client, RequestMessage message)
+        public async Task ExecuteTaskAsync(HChatClient client, RequestMessage message)
         {
-            if (!client.Authenticated)
-            {
-                // TODO: Send response.
-                return;
-            }
-
             var parsed = ProtobufHelper.TryParse(KickUserRequest.Parser, message.Message, out var request);
             if (!parsed)
             {
-                // TODO: Send response.
+                await client.SendResponseTaskAsync(
+                    ResponseStatus.Error,
+                    ByteString.Empty,
+                    message).ConfigureAwait(false);
                 return;
             }
 
+            // TODO: Fix/implement this command
             switch (request.Scope)
             {
                 case ActionScope.Channel:
@@ -85,7 +83,7 @@
         /// </returns>
         private async Task RemoveFromChannel([NotNull] HChatClient sender, [CanBeNull] string clientId, [CanBeNull] string channelId, [CanBeNull] string reason)
         {
-            var channel = await _communityManager.TryGetChannelTask(channelId).ConfigureAwait(false);
+            var channel = _communityManager.TryGetChannel(channelId);
             if (channel == null)
             {
                 // TODO: Send response.
@@ -93,7 +91,7 @@
             }
 
             // TODO: Check permission of client who is sending
-            var client = await channel.GetItemTask(clientId).ConfigureAwait(false);
+            var client = channel.GetItem(clientId);
             if (client == null)
             {
                 // TODO: Send response.
@@ -108,7 +106,7 @@
                 UserId = client.Id.ToString()
             }.ToByteString();
 
-            if (await channel.RemoveItemTask(client).ConfigureAwait(false))
+            if (channel.RemoveItem(client))
             {
                 await channel.SendToAllTask(ResponseStatus.Success, RequestType.KickUser, response).ConfigureAwait(false);
             }
@@ -134,7 +132,7 @@
         /// </returns>
         private async Task RemoveFromCommunity([NotNull] HChatClient sender, [CanBeNull] string clientId, [CanBeNull] string communityId, [CanBeNull] string reason)
         {
-            var community = await _communityManager.GetItemTask(communityId).ConfigureAwait(false);
+            var community = _communityManager.GetItem(communityId);
             if (community == null)
             {
                 // TODO: Send response.
@@ -142,7 +140,7 @@
             }
 
             // TODO: Check permission of client who is sending
-            var client = await community.GetItemTask(clientId).ConfigureAwait(false);
+            var client = community.GetItem(clientId);
             if (client == null)
             {
                 // TODO: Send response.

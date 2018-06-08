@@ -6,6 +6,7 @@
     using System.Linq;
     using System.Threading.Tasks;
 
+    using ChatProtos.Data;
     using ChatProtos.Networking;
 
     using Google.Protobuf;
@@ -34,14 +35,39 @@
         /// <param name="name">
         /// The name.
         /// </param>
+        /// <param name="clients">
+        /// The clients.
+        /// </param>
+        public HCommunity(Guid id, [NotNull] string name, [NotNull] ConcurrentDictionary<Guid, HChatClient> clients)
+        {
+            ChannelManager = new HChannelManager(new ConcurrentDictionary<Guid, HChannel>());
+            Id = id;
+            Name = name;
+            _clients = clients;
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="HCommunity"/> class.
+        /// </summary>
+        /// <param name="id">
+        /// The id.
+        /// </param>
+        /// <param name="name">
+        /// The name.
+        /// </param>
         /// <param name="channelManager">
         /// The channel manager.
         /// </param>
         /// <param name="clients">
         /// The clients.
         /// </param>
-        public HCommunity(Guid id, [NotNull] string name, [NotNull] HChannelManager channelManager, [NotNull] ConcurrentDictionary<Guid, HChatClient> clients)
+        public HCommunity(
+            Guid id,
+            [NotNull] string name,
+            [NotNull] HChannelManager channelManager,
+            [NotNull] ConcurrentDictionary<Guid, HChatClient> clients)
         {
+            // Might be unused.
             ChannelManager = channelManager;
             Id = id;
             Name = name;
@@ -70,17 +96,20 @@
         /// </summary>
         /// <param name="item">Client to be added</param>
         /// <returns>Boolean if client was added</returns>
-        public async Task<bool> AddItemTask([NotNull] HChatClient item)
+        public bool AddItem([NotNull] HChatClient item)
         {
-            await Task.Yield();
             return _clients.TryAdd(item.Id, item);
         }
 
         /// <summary>
         /// Removes client from the community and leaves every channel that the person has joined.
         /// </summary>
-        /// <param name="item">Client to be removed</param>
-        /// <returns>Boolean if client was removed</returns>
+        /// <param name="item">
+        /// Client to be removed
+        /// </param>
+        /// <returns>
+        /// The <see cref="bool"/> if client was removed.
+        /// </returns>
         public async Task<bool> RemoveItemTask([NotNull] HChatClient item)
         {
             await Task.Yield();
@@ -88,21 +117,23 @@
             {
                 return false;
             }
-            var items = await ChannelManager.GetChannelsTask().ConfigureAwait(false);
-            var tasks = items.Select(channel => channel.RemoveItemTask(item));
-            await Task.WhenAll(tasks).ConfigureAwait(false);
-            return _clients.TryRemove(item.Id, out var _);
+            var didRemove = ChannelManager.GetChannels().Select(channel => channel.RemoveItem(item));
+
+            return didRemove.All(b => b) && _clients.TryRemove(item.Id, out var _);
         }
 
         /// <summary>
         /// Gets a client from the community.
         /// </summary>
-        /// <param name="id">GUID of the client</param>
-        /// <returns>HChatClient or null if client wasn't found</returns>
-        [ItemCanBeNull]
-        public async Task<HChatClient> GetItemTask(Guid id)
+        /// <param name="id">
+        /// GUID of the client
+        /// </param>
+        /// <returns>
+        /// The <see cref="HChatClient"/>.
+        /// </returns>
+        [CanBeNull]
+        public HChatClient GetItem(Guid id)
         {
-            await Task.Yield();
             _clients.TryGetValue(id, out var result);
             return result;
         }
@@ -127,9 +158,8 @@
         /// <returns>
         /// The <see cref="Task"/>.
         /// </returns>
-        public async Task<IEnumerable<HChatClient>> GetItemsTask()
+        public IEnumerable<HChatClient> GetItems()
         {
-            await Task.Yield();
             return _clients.Values;
         }
 
@@ -148,10 +178,11 @@
         /// <returns>
         /// The <see cref="Task"/>.
         /// </returns>
-        public async Task SendToAllTask(ResponseStatus status, RequestType type, [CanBeNull] ByteString message)
+        public Task SendToAllTask(ResponseStatus status, RequestType type, [CanBeNull] ByteString message)
         {
-            var tasks = _clients.Values.Select(client => client.SendResponseTask(status, type, message));
-            await Task.WhenAll(tasks).ConfigureAwait(false);
+            var tasks = _clients.Values.Select(client => client.SendResponseTaskAsync(status, type, message));
+            var enumerable = tasks as Task[] ?? tasks.ToArray();
+            return enumerable.Length > 0 ? Task.WhenAll(enumerable) : Task.CompletedTask;
         }
 
         /// <summary>
@@ -161,16 +192,32 @@
         /// The string id.
         /// </param>
         /// <returns>
-        /// The <see cref="Task"/>.
+        /// The <see cref="HChatClient"/>.
         /// </returns>
-        public async Task<HChatClient> GetItemTask(string id)
+        public HChatClient GetItem(string id)
         {
             var parsed = Guid.TryParse(id, out var guid);
-            if (!parsed)
-            {
-                return null;
-            }
-            return await GetItemTask(guid).ConfigureAwait(false);
+            return !parsed ? null : GetItem(guid);
+        }
+
+        /// <summary>
+        /// The get as protobuf.
+        /// </summary>
+        /// <returns>
+        /// The <see cref="Community"/>.
+        /// </returns>
+        public Community GetAsProtobuf()
+        {
+            return new Community
+                       {
+                           Channels =
+                               {
+                                   ChannelManager.GetChannels()
+                                       .Select(channel => channel.GetAsProto())
+                               },
+                           Id = Id.ToString(),
+                           Name = Name,
+                       };
         }
     }
 }

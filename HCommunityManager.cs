@@ -3,7 +3,15 @@
     using System;
     using System.Collections.Concurrent;
     using System.Collections.Generic;
+    using System.Linq;
     using System.Threading.Tasks;
+
+    using ChatProtos.Networking;
+    using ChatProtos.Networking.Messages;
+
+    using Google.Protobuf;
+
+    using HServer.Networking;
 
     using JetBrains.Annotations;
 
@@ -32,22 +40,28 @@
         /// <summary>
         /// Adds a community.
         /// </summary>
-        /// <param name="item">Community to be added</param>
-        /// <returns>Boolean if community was added</returns>
-        public async Task<bool> AddItemTask([NotNull] HCommunity item)
+        /// <param name="item">
+        /// Community to be added
+        /// </param>
+        /// <returns>
+        /// The <see cref="bool"/> if community was added.
+        /// </returns>
+        public bool AddItem([NotNull] HCommunity item)
         {
-            await Task.Yield();
             return _communities.TryAdd(item.Id, item);
         }
 
         /// <summary>
         /// Removes a community.
         /// </summary>
-        /// <param name="item">Community to be removed</param>
-        /// <returns>Boolean if community was removed</returns>
-        public async Task<bool> RemoveItemTask([NotNull] HCommunity item)
+        /// <param name="item">
+        /// Community to be removed
+        /// </param>
+        /// <returns>
+        /// The <see cref="bool"/> if community was removed.
+        /// </returns>
+        public bool RemoveItem([NotNull] HCommunity item)
         {
-            await Task.Yield();
             return _communities.TryRemove(item.Id, out var _);
         }
 
@@ -55,11 +69,10 @@
         /// Gets a community with specified GUID.
         /// </summary>
         /// <param name="id">GUID of community</param>
-        /// <returns>The <see cref="Task"/> with HCommunity result if it was found or null otherwise</returns>
-        [ItemCanBeNull]
-        public async Task<HCommunity> GetItemTask(Guid id)
+        /// <returns>The <see cref="HCommunity"/></returns>
+        [CanBeNull]
+        public HCommunity GetItem(Guid id)
         {
-            await Task.Yield();
             return _communities.TryGetValue(id, out var result) ? result : null;
         }
 
@@ -70,12 +83,11 @@
         /// The string id of community.
         /// </param>
         /// <returns>
-        /// The <see cref="Task"/>.
+        /// The <see cref="HCommunity"/>.
         /// </returns>
-        [ItemCanBeNull]
-        public async Task<HCommunity> GetItemTask([CanBeNull] string id)
+        [CanBeNull]
+        public HCommunity GetItem([CanBeNull] string id)
         {
-            await Task.Yield();
             var parsed = Guid.TryParse(id, out var result);
             if (!parsed)
             {
@@ -91,9 +103,8 @@
         /// <returns>
         /// The <see cref="Task"/>.
         /// </returns>
-        public async Task<IEnumerable<HCommunity>> GetItemsTask()
+        public IEnumerable<HCommunity> GetItemsTask()
         {
-            await Task.Yield();
             return _communities.Values;
         }
 
@@ -107,10 +118,10 @@
         /// The channel id in string.
         /// </param>
         /// <returns>
-        /// A <see cref="Task"/> with <see cref="HChannel"/> item.
+        /// A <see cref="HChannel"/>.
         /// </returns>
-        [ItemCanBeNull]
-        public async Task<HChannel> TryGetChannelTask([CanBeNull] string community, [CanBeNull] string channel)
+        [CanBeNull]
+        public HChannel TryGetChannel([CanBeNull] string community, [CanBeNull] string channel)
         {
             var parsedCommunity = Guid.TryParse(community, out var communityId);
             var parsedChannel = Guid.TryParse(channel, out var channelId);
@@ -119,13 +130,9 @@
                 return null;
             }
 
-            var communityInstance = await GetItemTask(communityId).ConfigureAwait(false);
-            if (communityInstance == null)
-            {
-                return null;
-            }
+            var communityInstance = GetItem(communityId);
 
-            var channelInstance = await communityInstance.ChannelManager.GetItemTask(channelId).ConfigureAwait(false);
+            var channelInstance = communityInstance?.ChannelManager.GetItem(channelId);
             return channelInstance;
         }
 
@@ -136,10 +143,10 @@
         /// The channel id string.
         /// </param>
         /// <returns>
-        /// A <see cref="Task"/> with <see cref="HChannel"/> item.
+        /// A <see cref="HChannel"/>.
         /// </returns>
-        [ItemCanBeNull]
-        public async Task<HChannel> TryGetChannelTask([CanBeNull] string channel)
+        [CanBeNull]
+        public HChannel TryGetChannel([CanBeNull] string channel)
         {
             var parsed = Guid.TryParse(channel, out var id);
             if (!parsed)
@@ -147,15 +154,7 @@
                 return null;
             }
 
-            foreach (var community in _communities.Values)
-            {
-                var result = await community.ChannelManager.GetItemTask(id).ConfigureAwait(false);
-                if (result != null)
-                {
-                    return result;
-                }
-            }
-            return null;
+            return _communities.Values.Select(community => community.ChannelManager.GetItem(id)).FirstOrDefault(result => result != null);
         }
     }
 }

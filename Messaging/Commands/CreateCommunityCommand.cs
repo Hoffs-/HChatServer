@@ -38,35 +38,52 @@
         }
 
         /// <inheritdoc />
-        public async Task ExecuteTask(HChatClient client, RequestMessage message)
+        public async Task ExecuteTaskAsync(HChatClient client, RequestMessage message)
         {
             if (!client.Authenticated)
             {
-                // TODO: Send response
+                await client.SendResponseTaskAsync(
+                    ResponseStatus.Unauthorized,
+                    RequestType.CreateCommunity,
+                    ByteString.Empty,
+                    message.Nonce).ConfigureAwait(false);
                 return;
             }
+
             var parsed = ProtobufHelper.TryParse(CreateCommunityRequest.Parser, message.Message, out var result);
             if (!parsed)
             {
-                // TODO: Send response
+                await client.SendResponseTaskAsync(
+                    ResponseStatus.Error,
+                    RequestType.CreateCommunity,
+                    ByteString.Empty,
+                    message.Nonce).ConfigureAwait(false);
                 return;
             }
 
             var manager = new HChannelManager(new ConcurrentDictionary<Guid, HChannel>());
-            var community = new HCommunity(Guid.NewGuid(), result.CommunityName, manager, new ConcurrentDictionary<Guid, HChatClient>());
-            var channel = new HChannel(Guid.NewGuid(), "General", community, new ConcurrentDictionary<Guid, HChatClient>(), DateTime.Now);
-            
-            await community.ChannelManager.AddItemTask(channel).ConfigureAwait(false);
-            await community.AddItemTask(client).ConfigureAwait(false);
-            await _communityManager.AddItemTask(community).ConfigureAwait(false);
+            var community = new HCommunity(
+                Guid.NewGuid(),
+                result.CommunityName,
+                manager,
+                new ConcurrentDictionary<Guid, HChatClient>());
+            var channel = new HChannel(
+                Guid.NewGuid(),
+                "General",
+                community,
+                new ConcurrentDictionary<Guid, HChatClient>(),
+                DateTime.Now);
 
-            var response = new CreateCommunityResponse
-            {
-                CommunityId = community.Id.ToString(),
-                CommunityName = community.Name
-            }.ToByteString();
+            community.ChannelManager.AddItem(channel);
+            community.AddItem(client);
+            _communityManager.AddItem(community);
 
-            await client.SendResponseTask(ResponseStatus.Created, RequestType.CreateCommunity, response).ConfigureAwait(false);
+            var response =
+                new CreateCommunityResponse { CommunityId = community.Id.ToString(), CommunityName = community.Name }
+                    .ToByteString();
+
+            await client.SendResponseTaskAsync(ResponseStatus.Created, RequestType.CreateCommunity, response)
+                .ConfigureAwait(false);
         }
     }
 }

@@ -3,6 +3,7 @@
 namespace ChatServer.Messaging.Commands
 {
     using System;
+    using System.Linq;
     using System.Threading.Tasks;
 
     using ChatProtos.Data;
@@ -40,41 +41,26 @@ namespace ChatServer.Messaging.Commands
         }
 
         /// <inheritdoc />
-        public async Task ExecuteTask(HChatClient client, RequestMessage message)
+        public async Task ExecuteTaskAsync(HChatClient client, RequestMessage message)
         {
             var parsed = ProtobufHelper.TryParse(ChatMessageRequest.Parser, message.Message, out var request);
-            if (!parsed)
+            if (!parsed || !Guid.TryParse(request.ChannelId, out var _))
             {
-                await client.SendResponseTask(ResponseStatus.BadRequest, RequestType.ChatMessage, null).ConfigureAwait(false);
-                return;
-            }
-
-            if (!client.Authenticated)
-            {
-                var response = new ChatMessageResponse()
-                {
-                    ChannelId = request?.ChannelId,
-                    Message = request?.Message
-                };
-                await client
-                    .SendResponseTask(ResponseStatus.Unauthorized, RequestType.ChatMessage, response.ToByteString())
-                    .ConfigureAwait(false);
+                await client.SendResponseTaskAsync(ResponseStatus.BadRequest, ByteString.Empty, message).ConfigureAwait(false);
                 return;
             }
 
             var chatMessage = request.Message;
-
-            var channel = await _communityManager.TryGetChannelTask(request.ChannelId).ConfigureAwait(false);
-
+            var channel = client.GetChannels().FirstOrDefault(userChannel => userChannel.Id == Guid.Parse(request.ChannelId));
             if (channel?.HasItem(client.Id) != true)
             {
-                // TODO: Send response
                 Console.WriteLine("[SERVER] User tried sending in channel that he isnt in");
+                await client.SendResponseTaskAsync(ResponseStatus.NotFound, ByteString.Empty, message)
+                    .ConfigureAwait(false);
                 return;
             }
 
             Console.WriteLine("[SERVER] Sending message to channel {0}", channel.Id);
-            
             var chatResponse = new ChatMessageResponse
             {
                 Message = new ChatMessage

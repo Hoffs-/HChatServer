@@ -24,6 +24,6 @@
         /// Task <see cref="Task"/>.
         /// </returns>
         [NotNull]
-        Task ExecuteTask([NotNull] HChatClient client, [NotNull] RequestMessage message);
+        Task ExecuteTaskAsync([NotNull] HChatClient client, [NotNull] RequestMessage message);
     }
 }

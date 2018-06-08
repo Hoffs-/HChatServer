@@ -2,6 +2,7 @@
 {
     using System;
     using System.Collections.Concurrent;
+    using System.Collections.Generic;
     using System.Diagnostics.CodeAnalysis;
     using System.Globalization;
     using System.Linq;
@@ -28,10 +29,24 @@
         private readonly ConcurrentDictionary<Guid, HChannel> _channels = new ConcurrentDictionary<Guid, HChannel>();
 
         /// <summary>
+        /// Client friends.
+        /// </summary>
+        [NotNull]
+        private readonly ConcurrentDictionary<Guid, HChatClient> _friends =
+            new ConcurrentDictionary<Guid, HChatClient>();
+
+        /// <summary>
         /// Gets the display name.
         /// </summary>
         [NotNull]
         private string _displayName = string.Empty;
+
+        /// <summary>
+        /// Joined communities.
+        /// </summary>
+        [NotNull]
+        private readonly ConcurrentDictionary<Guid, HCommunity> _communities =
+            new ConcurrentDictionary<Guid, HCommunity>();
 
         /// <summary>
         /// Initializes a new instance of the <see cref="HChatClient"/> class.
@@ -115,6 +130,7 @@
             {
                 return false;
             }
+
             _displayName = name;
             return true;
         }
@@ -125,9 +141,12 @@
         /// <param name="channel">
         /// The channel.
         /// </param>
-        public void AddChannel([NotNull] HChannel channel)
+        /// <returns>
+        /// The <see cref="bool"/>.
+        /// </returns>
+        public bool AddChannel([NotNull] HChannel channel)
         {
-            _channels.TryAdd(channel.Id, channel);
+            return _channels.TryAdd(channel.Id, channel);
         }
 
         /// <summary>
@@ -136,39 +155,116 @@
         /// <param name="channel">
         /// The channel.
         /// </param>
-        public void RemoveChannel([NotNull] HChannel channel)
+        /// <returns>
+        /// The <see cref="bool"/>.
+        /// </returns>
+        public bool RemoveChannel([NotNull] HChannel channel)
         {
-            _channels.TryRemove(channel.Id, out channel);
+            return _channels.TryRemove(channel.Id, out channel);
+        }
+
+        /// <summary>
+        /// Gets user channels.
+        /// </summary>
+        /// <returns>
+        /// The <see cref="IEnumerable"/> channels.
+        /// </returns>
+        public IEnumerable<HChannel> GetChannels()
+        {
+            return _channels.Values.ToArray();
+        }
+
+        /// <summary>
+        /// Add <see cref="HCommunity"/> to joined channel dictionary.
+        /// </summary>
+        /// <param name="community">
+        /// The channel.
+        /// </param>
+        /// <returns>
+        /// The <see cref="bool"/>.
+        /// </returns>
+        public bool AddCommunity([NotNull] HCommunity community)
+        {
+            return _communities.TryAdd(community.Id, community);
+        }
+
+        /// <summary>
+        /// Removes <see cref="HCommunity"/> from joined channel dictionary.
+        /// </summary>
+        /// <param name="community">
+        /// The channel.
+        /// </param>
+        /// <returns>
+        /// The <see cref="bool"/>.
+        /// </returns>
+        public bool RemoveCommunity([NotNull] HCommunity community)
+        {
+            return _communities.TryRemove(community.Id, out community);
+        }
+
+        /// <summary>
+        /// Gets user communities.
+        /// </summary>
+        /// <returns>
+        /// The <see cref="IEnumerable"/> communities.
+        /// </returns>
+        public IEnumerable<HCommunity> GetCommunities()
+        {
+            return _communities.Values.ToArray();
         }
 
         /// <summary>
         /// Sends <see cref="ResponseMessage"/> to client.
         /// </summary>
         /// <param name="status">
-        /// Response status.
+        ///     Response status.
         /// </param>
         /// <param name="type">
-        /// Request type.
+        ///     Request type.
         /// </param>
         /// <param name="message">
-        /// Message bytes.
+        ///     Message bytes.
+        /// </param>
+        /// <param name="nonce">
+        ///     Message nonce.
         /// </param>
         /// <returns>
         /// The <see cref="Task"/>.
         /// </returns>
-        public async Task SendResponseTask(
+        public Task SendResponseTaskAsync(
             [NotNull] ResponseStatus status,
             [NotNull] RequestType type,
-            [CanBeNull] ByteString message)
+            [CanBeNull] ByteString message,
+            [CanBeNull] string nonce = "")
         {
-            await Connection.SendMessageTask(
-                new ResponseMessage
-                    {
-                        Status = status, 
-                        Type = (int)type, 
-                        Message = message
-                    }.ToByteArray())
-                .ConfigureAwait(false);
+            return Connection.SendMessageTask(
+                new ResponseMessage { Status = status, Type = (int)type, Nonce = nonce, Message = message }
+                    .ToByteArray());
+        }
+
+        /// <summary>
+        /// Sends <see cref="ResponseMessage"/> to client.
+        /// </summary>
+        /// <param name="status">
+        /// The <see cref="ResponseStatus"/>.
+        /// </param>
+        /// <param name="message">
+        /// The response message <see cref="ByteString"/>.
+        /// </param>
+        /// <param name="request">
+        /// The <see cref="RequestMessage"/>.
+        /// </param>
+        /// <returns>
+        /// The <see cref="Task"/>.
+        /// </returns>
+        public Task SendResponseTaskAsync(
+            [NotNull] ResponseStatus status,
+            [CanBeNull] ByteString message,
+            [NotNull] RequestMessage request)
+        {
+            return Connection.SendMessageTask(
+                new ResponseMessage { Status = status, Type = request.Type, Nonce = request.Nonce, Message = message }
+                    .ToByteArray());
         }
 
         /* 
@@ -200,11 +296,13 @@
             var authenticationResponse = new AuthenticationResponse(false, null, null, null);
             if (password != null)
             {
-                authenticationResponse = await authenticator.TryPasswordAuthenticationTask(this, password).ConfigureAwait(false);
+                authenticationResponse =
+                    await authenticator.TryPasswordAuthenticationTask(this, password).ConfigureAwait(false);
             }
             else if (token != null)
             {
-                authenticationResponse = await authenticator.TryTokenAuthenticationTask(this, token).ConfigureAwait(false);
+                authenticationResponse =
+                    await authenticator.TryTokenAuthenticationTask(this, token).ConfigureAwait(false);
             }
 
             if (authenticationResponse.Success)
@@ -214,12 +312,13 @@
                 {
                     Id = result;
                     Authenticated = true;
+                    Token = authenticationResponse.Token;
                 }
                 else
                 {
                     Console.WriteLine("[SERVER] Coulnd't parse GUID for user {0}", username);
                 }
-                
+
                 // DisplayName = authenticationResponse.DisplayName;
             }
 
@@ -254,22 +353,23 @@
         }
 
         /// <summary>
-        /// The get as user.
+        /// The get as protobuf user.
         /// </summary>
         /// <returns>
         /// The <see cref="User"/>.
         /// </returns>
         [NotNull]
-        public User GetAsUser()
+        public User GetAsUserProto()
         {
+            // TODO: Add user channels/friends
             return new User
-            {
-                Id = Id.ToString(),
-                Created = Created.ToString(CultureInfo.InvariantCulture),
-                DisplayName = GetDisplayName(),
-                JoinedChannels = { }, // TODO: Is sending all joined channels necessary?
-                Roles = { } // TODO: Fix once roles are implemented.
-            };
+                       {
+                           Id = Id.ToString(),
+                           Created = Created.ToString(CultureInfo.InvariantCulture),
+                           DisplayName = GetDisplayName(),
+                           Communities = { _communities.Values.Select(community => community.GetAsProtobuf()) },
+                           Roles = { },
+                       };
         }
     }
 }

@@ -1,4 +1,6 @@
-﻿namespace ChatServer.Messaging.Commands
+﻿using Google.Protobuf;
+
+namespace ChatServer.Messaging.Commands
 {
     using System;
     using System.Threading.Tasks;
@@ -35,23 +37,22 @@
         }
 
         /// <inheritdoc />
-        public async Task ExecuteTask(HChatClient client, RequestMessage message)
+        public async Task ExecuteTaskAsync(HChatClient client, RequestMessage message)
         {
-            if (!client.Authenticated)
-            {
-                // TODO: Send response.
-                return;
-            }
-
             var parsed = ProtobufHelper.TryParse(LogoutRequest.Parser, message.Message, out var request);
             if (!parsed)
             {
-                // TODO: Send response.
+                await client.SendResponseTaskAsync(ResponseStatus.Error, RequestType.Logout, ByteString.Empty, message.Nonce).ConfigureAwait(false);
                 return;
             }
 
-            await client.TryDeauthenticatingTask().ConfigureAwait(false);
             await _clientManager.RemoveItemTask(client).ConfigureAwait(false);
+            var response = new LogoutResponse
+            {
+                UserId = client.Id.ToString(),
+            }.ToByteString();
+            await client.SendResponseTaskAsync(ResponseStatus.Success, RequestType.Logout, response, message.Nonce).ConfigureAwait(false);
+            await client.TryDeauthenticatingTask().ConfigureAwait(false);
             Console.WriteLine("[SERVER] After logout for client {0}", client.Id);
         }
     }

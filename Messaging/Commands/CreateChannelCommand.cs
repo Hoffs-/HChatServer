@@ -2,6 +2,7 @@
 {
     using System;
     using System.Collections.Concurrent;
+    using System.Linq;
     using System.Threading.Tasks;
 
     using ChatProtos.Networking;
@@ -12,61 +13,52 @@
     using HServer;
     using HServer.Networking;
 
-    using JetBrains.Annotations;
-
     /// <inheritdoc />
     /// <summary>
     /// The create channel command.
     /// </summary>
     public class CreateChannelCommand : IChatServerCommand
     {
-        /// <summary>
-        /// The server community manager.
-        /// </summary>
-        [NotNull]
-        private readonly HCommunityManager _communityManager;
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="CreateChannelCommand"/> class.
-        /// </summary>
-        /// <param name="communityManager">
-        /// The server community manager.
-        /// </param>
-        public CreateChannelCommand([NotNull] HCommunityManager communityManager)
-        {
-            _communityManager = communityManager;
-        }
-
         /// <inheritdoc />
-        public async Task ExecuteTask(HChatClient client, RequestMessage message)
+        public async Task ExecuteTaskAsync(HChatClient client, RequestMessage message)
         {
             var parsed = ProtobufHelper.TryParse(CreateChannelRequest.Parser, message.Message, out var request);
-            if (!parsed || !client.Authenticated)
+            if (!parsed || !Guid.TryParse(request.CommunityId, out _))
             {
-                // TODO: Send response
+                await client.SendResponseTaskAsync(ResponseStatus.BadRequest, ByteString.Empty, message)
+                    .ConfigureAwait(false);
                 return;
             }
 
-            var community = await _communityManager.GetItemTask(request.CommunityId);
-            
-            if (community == null || !community.HasClient(client.Id)) 
+            var community = client.GetCommunities()
+                .FirstOrDefault(clientCommunity => clientCommunity.Id == Guid.Parse(request.CommunityId));
+            if (community == null || !community.HasClient(client.Id))
             {
-                // TODO: Also check for permission
-                // TODO: Send reponse
+                await client.SendResponseTaskAsync(
+                    ResponseStatus.NotFound,
+                    RequestType.CreateChannel,
+                    ByteString.Empty,
+                    message.Nonce).ConfigureAwait(false);
                 return;
             }
 
-            var channel = new HChannel(Guid.NewGuid(), request.ChannelName, community, new ConcurrentDictionary<Guid, HChatClient>(), DateTime.UtcNow);
-            await channel.AddItemTask(client).ConfigureAwait(false);
-            await community.ChannelManager.AddItemTask(channel).ConfigureAwait(false);
-            
-            var response = new CreateChannelResponse
+            var channel = new HChannel(
+                Guid.NewGuid(),
+                request.ChannelName,
+                community,
+                new ConcurrentDictionary<Guid, HChatClient>(),
+                DateTime.UtcNow);
+            if (!community.ChannelManager.AddItem(channel) || !channel.AddItem(client))
             {
-                ChannelId = channel.Id.ToString(),
-                ChannelName = channel.Name
-            }.ToByteString();
+                await client.SendResponseTaskAsync(ResponseStatus.Error, ByteString.Empty, message)
+                    .ConfigureAwait(false);
+                return;
+            }
 
-            await community.SendToAllTask(ResponseStatus.Created, RequestType.CreateChannel, response).ConfigureAwait(false);
+            var response = new CreateChannelResponse { ChannelId = channel.Id.ToString(), ChannelName = channel.Name }
+                .ToByteString();
+            await community.SendToAllTask(ResponseStatus.Created, RequestType.CreateChannel, response)
+                .ConfigureAwait(false);
         }
     }
 }

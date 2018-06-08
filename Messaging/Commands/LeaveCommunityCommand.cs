@@ -36,35 +36,45 @@
         }
 
         /// <inheritdoc />
-        public async Task ExecuteTask(HChatClient client, RequestMessage message)
+        public async Task ExecuteTaskAsync(HChatClient client, RequestMessage message)
         {
-            if (!client.Authenticated)
-            {
-                // TODO: Send response
-                return;
-            }
-
             var parsed = ProtobufHelper.TryParse(LeaveCommunityRequest.Parser, message.Message, out var request);
             if (!parsed)
             {
-                // TODO: Send response
+                await client.SendResponseTaskAsync(
+                    ResponseStatus.Error,
+                    RequestType.LeaveCommunity,
+                    ByteString.Empty,
+                    message.Nonce).ConfigureAwait(false);
                 return;
             }
 
-            var community = await _communityManager.GetItemTask(request.CommunityId);
+            var response = new LeaveCommunityResponse { CommunityId = request.CommunityId }.ToByteString();
+
+            var community = _communityManager.GetItem(request.CommunityId);
             if (community == null)
             {
-                // TODO: Send response
+                await client.SendResponseTaskAsync(
+                    ResponseStatus.NotFound,
+                    RequestType.LeaveCommunity,
+                    response,
+                    message.Nonce).ConfigureAwait(false);
                 return;
             }
 
-            await community.RemoveItemTask(client).ConfigureAwait(false);
+            var didRemove = await community.RemoveItemTask(client).ConfigureAwait(false);
+            if (!didRemove)
+            {
+                await client.SendResponseTaskAsync(
+                    ResponseStatus.Error,
+                    RequestType.LeaveCommunity,
+                    response,
+                    message.Nonce).ConfigureAwait(false);
+            }
 
-            var response = new LeaveCommunityResponse { CommunityId = community.Id.ToString() }.ToByteString();
-
-            var clients = await community.GetItemsTask().ConfigureAwait(false);
+            var clients = community.GetItems();
             var tasks = clients.Select(
-                chatClient => chatClient.SendResponseTask(
+                chatClient => chatClient.SendResponseTaskAsync(
                     ResponseStatus.Success,
                     RequestType.LeaveCommunity,
                     response));

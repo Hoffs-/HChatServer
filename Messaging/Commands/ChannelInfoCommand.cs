@@ -38,38 +38,35 @@
         }
 
         /// <inheritdoc />
-        public async Task ExecuteTask(HChatClient client, RequestMessage message)
+        public async Task ExecuteTaskAsync(HChatClient client, RequestMessage message)
         {
-            var parsed = ProtobufHelper.TryParse(ChannelInfoRequest.Parser, message.Message, out var infoRequest);
-            if (!parsed || !client.Authenticated)
+            var parsed = ProtobufHelper.TryParse(ChannelInfoRequest.Parser, message.Message, out var request);
+            if (!parsed)
             {
                 Console.WriteLine("[SERVER] Couldn't parse protobuf or client not authenticated");
+                await client.SendResponseTaskAsync(ResponseStatus.Error, ByteString.Empty, message)
+                    .ConfigureAwait(false);
                 return;
             }
 
-            var channel = await _communityManager.TryGetChannelTask(infoRequest.ChannelId);
+            var response = new ChannelInfoResponse
+                               {
+                                   ChannelId = request.ChannelId,
+                               };
+
+            var channel = _communityManager.TryGetChannel(request.ChannelId);
             if (channel == null)
             {
                 Console.WriteLine("[SERVER] Channel not found");
+                await client.SendResponseTaskAsync(ResponseStatus.Error, response.ToByteString(), message)
+                    .ConfigureAwait(false);
                 return;
             }
 
+            response.Channel = channel.GetAsProto();
+            response.ChannelInfo = channel.GetAsChannelInfoProto();
 
-            var response = new ChannelInfoResponse
-            {
-                ChannelId = infoRequest.ChannelId,
-                Channel = new Channel
-                {
-                    Id = channel.Id.ToString(),
-                    Name = channel.Name
-                },
-                ChannelInfo = new ChannelInfo
-                {
-                    Created = channel.Created.ToString(CultureInfo.InvariantCulture),
-                    Users = { channel.GetUserItems() }
-                }
-            };
-            await client.SendResponseTask(ResponseStatus.Success, RequestType.ChannelInfo, response.ToByteString()).ConfigureAwait(false);
+            await client.SendResponseTaskAsync(ResponseStatus.Success, RequestType.ChannelInfo, response.ToByteString()).ConfigureAwait(false);
         }
     }
 }

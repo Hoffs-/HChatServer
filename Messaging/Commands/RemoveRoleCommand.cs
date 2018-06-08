@@ -11,7 +11,7 @@
     public class RemoveRoleCommand : IChatServerCommand
     {
         /// <inheritdoc />
-        public async Task ExecuteTask(HChatClient client, RequestMessage message)
+        public async Task ExecuteTaskAsync(HChatClient client, RequestMessage message)
         {
             throw new System.NotImplementedException();
         }

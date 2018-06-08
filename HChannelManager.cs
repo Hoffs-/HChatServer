@@ -3,6 +3,7 @@
     using System;
     using System.Collections.Concurrent;
     using System.Collections.Generic;
+    using System.Linq;
     using System.Threading.Tasks;
 
     using JetBrains.Annotations;
@@ -12,6 +13,11 @@
     /// </summary>
     public class HChannelManager
     {
+        /// <summary>
+        /// The max channel count.
+        /// </summary>
+        private const int MaxChannels = 50;
+
         /// <summary>
         /// The channels.
         /// </summary>
@@ -36,11 +42,15 @@
         /// The channel.
         /// </param>
         /// <returns>
-        /// The <see cref="Task"/>.
+        /// A <see cref="bool"/> depending on success.
         /// </returns>
-        public async Task<bool> AddItemTask([NotNull] HChannel item)
+        public bool AddItem([NotNull] HChannel item)
         {
-            await Task.Yield();
+            if (_channels.Count > MaxChannels)
+            {
+                return false; // Should probably throw exception
+            }
+
             return _channels.TryAdd(item.Id, item);
         }
 
@@ -51,11 +61,10 @@
         /// The channel.
         /// </param>
         /// <returns>
-        /// The <see cref="Task"/>.
+        /// The <see cref="bool"/> if channel was removed.
         /// </returns>
-        public async Task<bool> RemoveItemTask([NotNull] HChannel item)
+        public bool RemoveItem([NotNull] HChannel item)
         {
-            await Task.Yield();
             return _channels.TryRemove(item.Id, out var _);
         }
 
@@ -66,12 +75,11 @@
         /// The GUID.
         /// </param>
         /// <returns>
-        /// The <see cref="Task"/>.
+        /// The <see cref="HChannel"/>.
         /// </returns>
-        [ItemCanBeNull]
-        public async Task<HChannel> GetItemTask(Guid id)
+        [CanBeNull]
+        public HChannel GetItem(Guid id)
         {
-            await Task.Yield();
             _channels.TryGetValue(id, out var result);
             return result;
         }
@@ -82,10 +90,14 @@
         /// <returns>
         /// The <see cref="Task"/>.
         /// </returns>
-        public async Task<IEnumerable<HChannel>> GetChannelsTask()
+        public IEnumerable<HChannel> GetChannels()
         {
-            await Task.Yield();
-            return _channels.Values;
+            return _channels.Values.ToArray();
+        }
+
+        public String test()
+        {
+            return "a";
         }
     }
 }

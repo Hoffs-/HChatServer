@@ -1,3 +1,6 @@
 [submodule "submodules/HServer"]
 	path = submodules/HServer
 	url = https://github.com/Hoffs/HServer/
+[submodule "submodules/ChatProtos"]
+	path = submodules/ChatProtos
+	url = https://github.com/Hoffs/ChatProtos

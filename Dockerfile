@@ -3,7 +3,8 @@ RUN apt-get -yq update
 RUN apt-get -yqq install git protobuf-compiler
 
 # Clone repo
-RUN git clone -b dev https://github.com/Hoffs/HChatServer /usr/local/src/HChatServer
+ARG build_branch=master
+RUN git clone -b ${build_branch} https://github.com/Hoffs/HChatServer /usr/local/src/HChatServer
 WORKDIR /usr/local/src/HChatServer
 RUN git submodule update --init --recursive
 

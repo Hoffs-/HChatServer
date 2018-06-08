@@ -27,7 +27,7 @@ namespace ChatServer
             var communityManager = new HCommunityManager(new ConcurrentDictionary<Guid, HCommunity>());
             AddTestCommunities(communityManager);
             var processor = new HChatMessageProcessor(registry, clientManager);
-            var server = new HChatServer(4400, processor, registry, clientManager, null);
+            var server = new HChatServer(int.Parse(args[0]), processor, registry, clientManager, null);
             RegisterDefaultCommands(registry, communityManager, clientManager);
 
             Console.WriteLine();

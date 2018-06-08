@@ -1,0 +1,3 @@
+[submodule "submodules/HServer"]
+	path = submodules/HServer
+	url = https://github.com/Hoffs/HServer/

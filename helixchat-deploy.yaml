@@ -1,0 +1,135 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: helixchat
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: helixchatservice
+  namespace: helixchat
+  labels:
+    component: helixchat-service
+spec:
+  ports:
+  - port: 4300
+    name: websocket
+    protocol: TCP
+    targetPort: 4300
+  - port: 4400
+    name: tcp
+    protocol: TCP
+    targetPort: 4400
+  selector:
+    app: helixchat
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: helixchat
+    component: helixserver
+  name: helixserver-deployment
+  namespace: helixchat
+spec:
+  minReadySeconds: 10
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: helixchat
+      component: helixserver
+  template:
+    metadata:
+      labels:
+        app: helixchat
+        component: helixserver
+    spec:
+      containers:
+      - name: helixserver
+        image: hoffs/helixserver:latest
+        ports:
+        - containerPort: 4400
+        env:
+          - name: LISTEN_PORT
+            value: "4400"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: helixchat
+    component: helixproxy
+  name: helixproxy-deployment
+  namespace: helixchat
+spec:
+  minReadySeconds: 10
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: helixchat
+      component: helixproxy
+  template:
+    metadata:
+      labels:
+        app: helixchat
+        component: helixproxy
+    spec:
+      containers:
+      - name: helixproxy
+        image: hoffs/helixproxy:latest
+        ports:
+        - containerPort: 4300
+        env:
+          - name: IN_PORT
+            value: "4300"
+          - name: OUT_IP
+            value: "helixchatservice"
+          - name: OUT_PORT
+            value: "4400"
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: tcp-services
+  namespace: ingress-nginx
+data:
+  # 4300: "helixchat/helixchatservice:4300"
+  4400: "helixchat/helixchatservice:4400"
+---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: helixchat-ingress
+  namespace: helixchat
+  annotations:
+    # kubernetes.io/tls-acme: "true"
+    kubernetes.io/ingress.class: "nginx"
+    nginx.org/websocket-services: "helixchatservice"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+spec:
+  # tls:
+  # - hosts:
+  #   - echo.example.com
+  #   secretName: echoserver-tls
+  rules:
+  - host: ws.hff.lt
+    http:
+      paths:
+      - backend:
+          serviceName: helixchatservice
+          servicePort: 4300
+  # - host: chat.hff.lt
+  #   http:
+  #     paths:
+  #     - backend:
+  #         serviceName: helixchatservice
+  #         servicePort: 4400

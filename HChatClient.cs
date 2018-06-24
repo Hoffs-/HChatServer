@@ -1,6 +1,7 @@
 ﻿namespace ChatServer
 {
     using System;
+    using System.Collections;
     using System.Collections.Concurrent;
     using System.Collections.Generic;
     using System.Diagnostics.CodeAnalysis;
@@ -367,9 +368,16 @@
                            Id = Id.ToString(),
                            Created = Created.ToString(CultureInfo.InvariantCulture),
                            DisplayName = GetDisplayName(),
-                           Communities = { _communities.Values.Select(community => community.GetAsProtobuf()) },
+                           Communities = { _communities.Values.Select(community => community.GetAsProtobuf()).Append(getHomeCommunity()) },
                            Roles = { },
                        };
+        }
+
+        private Community getHomeCommunity()
+        {
+            var channels = _friends.Values.Select(
+                friend => new Channel { Id = friend.Id.ToString(), Name = friend.GetDisplayName(), });
+            return new Community { Id = "~", Name = "Home", Channels = { channels } };
         }
     }
 }
